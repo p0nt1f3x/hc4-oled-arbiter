@@ -8,5 +8,145 @@ import subprocess
 import sys
 import time
 
+#CPU Commands
+modelNameCommand = "lscpu | grep 'Model name:' | cut -d ':' -f 2 | xargs"
+vendorIDCommand = "lscpu | grep 'Vendor ID:' | cut -d ':' -f 2 | xargs"
+architectureCommand = "lscpu | grep 'Architecture:' | cut -d ':' -f 2 | xargs"
+CPUUsageCommand = "top -bn2 | grep '%Cpu' | tail -1 | grep -P '(....|...) id,' | awk '{print $8}'"
+physicalCoresCommand = "cat /proc/cpuinfo | grep \"cpu cores\" | uniq | cut -d':' -f2"
+logicalCoresCommand = "cat /proc/cpuinfo | grep -c 'processor'"
+sensorCheckCommand = "ls /sys/class/hwmon/hwmon1"
+temperatureCommand = "cat /sys/class/hwmon/hwmon1/temp1_input"
+
+#CPU Object
 class CPU:
+    global modelName 
+    global modelVendor
+    global architecture
+    global cores 
+    global logicalCores
+    global averageLoad
+    global hyperThreading
+    global temperature
+    global summary
+
+    #Initialization of generic values
+    def __init__(self):
+        self.modelName = 'GENERIC'
+        self.modelVendor = 'GENERIC'
+        self.architecture = 'GENERIC'
+        self.cores = 0
+        self.logicalCores = 0
+        self.averageLoad = 0
+        self.hyperThreading = False
+        self.temperature = 0
+    
+    def update(self):
+        #Detecting CPU Name
+        shell = os.popen(modelNameCommand)
+        self.modelName = shell.read().strip()
+
+        #Detecting CPU Vendor
+        shell = os.popen(vendorIDCommand)
+        self.modelVendor = shell.read().strip()
+
+        #Detecting architecture
+        shell = os.popen(architectureCommand)
+        self.architecture = shell.read().strip()
+
+        #Detecting CPU maximum Load
+        shell = os.popen(CPUUsageCommand)
+        maxLoad = float(shell.read())
+
+        #Detecting number of Physical Cores
+        shell = os.popen(physicalCoresCommand)
+        self.cores = shell.read().strip()
+
+        #Attempting Detection of HyperThreading
+        if bool(self.cores) == False:
+            #Outcome 1: CPU does not support HyperThreading
+            shell = os.popen(logicalCoresCommand)
+            self.logicalCores = self.cores = shell.read().strip()
+        else:
+            #Outcome 2: CPU does support HyperThreading
+            self.hyperThreading = True
+            shell = os.popen(logicalCoresCommand)
+            self.logicalCores = shell.read().strip()
+        
+        self.cores = int(self.cores) #Setting physical cores
+        self.logicalCores = int(self.logicalCores) #Setting logical cores
+        self.averageLoad = float(maxLoad/self.logicalCores) #Setting average load
+
+        #Getting temperatures
+        #Checking if hardware device is present
+        shell = os.popen(sensorCheckCommand)
+        check = shell.read().strip()
+        
+        if bool(check) == True: 
+            #Outcome 1: Hardware sensor is available
+            shell = os.popen(temperatureCommand)
+            self.temperature = shell.read().strip()
+            self.temperature = int(self.temperature)
+            
+            #Temperature reading is divided by 1000 
+            self.temperature = float(self.temperature/1000)
+        else:
+            #Outcome 2: Hardware sensor is not available
+            self.temperature = 0
+
+    #Function to export list
+    def exportList(self):
+        summary = {
+            "modelName" : self.modelName,
+            "modelVendor" : self.modelVendor,
+            "architecture" : self.architecture,
+            "cores" : self.cores,
+            "logicalCores" : self.logicalCores,
+            "averageLoad" : self.averageLoad,
+            "hyperThreading" : self.hyperThreading,
+            "temperature" : self.temperature
+        }
+        return summary
+
+#Node Object
+class Node:
+    global processor
+    processor = CPU()
+
+    #Function to initialize node
+    #def __init__(self):
+
+    #Function to get CPU
+    def getCPU():
+        return processor
+    
+    #Update Function
+    def update():
+        processor.update()
+
+    #Function made to print statistics
+    def printStats():
+        print(processor.exportList())
+        return 0
+
+#Main Method
+def main():
+    node = Node()
+
+    counter = 0
+    while True:
+        if counter != 10000:
+            counter +=1
+        else:
+            counter = 0
+            Node.update()
+            Node.printStats()
+            
+main()
+    
+
+        
+        
+
+
 
