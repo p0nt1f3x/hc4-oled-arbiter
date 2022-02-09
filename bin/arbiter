@@ -134,7 +134,7 @@ class RAM:
 
         #Reading total memory in MB
         shell = os.popen(memoryTotalCommand)
-        self.totalMemory = float(shell.read())
+        self.memoryTotal = float(shell.read())
 
         #Calculating memory percentage
         self.memoryPercentage = float((self.memoryUsed/self.totalMemory)*100)
