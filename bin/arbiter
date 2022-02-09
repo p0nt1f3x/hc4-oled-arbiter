@@ -81,6 +81,7 @@ class CPU:
         self.cores = int(self.cores) #Setting physical cores
         self.logicalCores = int(self.logicalCores) #Setting logical cores
         self.averageLoad = float(maxLoad/self.logicalCores) #Setting average load
+        self.averageLoad = round(self.averageLoad, 2) #Rounding average load to 2 decimal places
 
         #Getting temperatures
         #Checking if hardware device is present
@@ -137,7 +138,8 @@ class RAM:
         self.memoryTotal = float(shell.read())
 
         #Calculating memory percentage
-        self.memoryPercentage = float((self.memoryUsed/self.MemoryTotal)*100)
+        self.memoryPercentage = float((self.memoryUsed/self.memoryTotal)*100)
+        self.memoryPercentage = round(self.memoryPercentage, 2) #Rounding memory percentage to 2 decimal places
     
     #Function to export list
     def exportList(self):
@@ -194,10 +196,3 @@ def main():
             Node.printStats()
             
 main()
-    
-
-        
-        
-
-
-
