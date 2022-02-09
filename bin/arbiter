@@ -18,8 +18,13 @@ logicalCoresCommand = "cat /proc/cpuinfo | grep -c 'processor'"
 sensorCheckCommand = "ls /sys/class/hwmon/hwmon1"
 temperatureCommand = "cat /sys/class/hwmon/hwmon1/temp1_input"
 
+#Memory Commands
+memoryUsedCommand="free -m | awk '{print $3}' | tail -2 | head -1"
+memoryTotalCommand="free -m | awk '{print $2}' | tail -2 | head -1"
+
 #CPU Object
 class CPU:
+    #Variables
     global modelName 
     global modelVendor
     global architecture
@@ -108,10 +113,50 @@ class CPU:
         }
         return summary
 
+#RAM Object
+class RAM:
+    #Variables
+    global memoryUsed
+    global memoryTotal
+    global memoryPercentage
+    global summary
+
+     #Initialization of generic values
+    def __init__(self):
+        self.memoryUsed = 0
+        self.memoryTotal = 0
+        self.memoryPercentage = 0
+    
+    def update(self):
+        #Reading used memory in MB
+        shell = os.popen(memoryUsedCommand)
+        self.memoryUsed = float(shell.read())
+
+        #Reading total memory in MB
+        shell = os.popen(memoryTotalCommand)
+        self.totalMemory = float(shell.read())
+
+        #Calculating memory percentage
+        self.memoryPercentage = float((self.memoryUsed/self.totalMemory)*100)
+    
+    #Function to export list
+    def exportList(self):
+        summary = {
+            "memoryUsed" : self.memoryUsed,
+            "memoryTotal" : self.memoryTotal,
+            "memoryPercentage" : self.memoryPercentage
+        }
+        return summary
+
 #Node Object
 class Node:
+    #Variables
     global processor
+    global memory
+
+    #Initialization
     processor = CPU()
+    memory = RAM()
 
     #Function to initialize node
     #def __init__(self):
@@ -119,14 +164,20 @@ class Node:
     #Function to get CPU
     def getCPU():
         return processor
+
+    #Function to get RAM
+    def getRAM():
+        return memory
     
     #Update Function
     def update():
         processor.update()
+        memory.update()
 
     #Function made to print statistics
     def printStats():
         print(processor.exportList())
+        print(memory.exportList())
         return 0
 
 #Main Method
