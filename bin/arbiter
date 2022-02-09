@@ -137,7 +137,7 @@ class RAM:
         self.memoryTotal = float(shell.read())
 
         #Calculating memory percentage
-        self.memoryPercentage = float((self.memoryUsed/self.totalMemory)*100)
+        self.memoryPercentage = float((self.memoryUsed/self.MemoryTotal)*100)
     
     #Function to export list
     def exportList(self):
