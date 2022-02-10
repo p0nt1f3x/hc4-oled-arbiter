@@ -22,6 +22,11 @@ temperatureCommand = "cat /sys/class/hwmon/hwmon1/temp1_input"
 memoryUsedCommand="free -m | awk '{print $3}' | tail -2 | head -1"
 memoryTotalCommand="free -m | awk '{print $2}' | tail -2 | head -1"
 
+#NIC Commands
+IPCommand="hostname -I | cut -d' ' -f{}"
+interfaceNameCommand="ip r | grep {} | awk {}"
+macAddressCommand="cat /sys/class/net/{}/address"
+
 #CPU Object
 class CPU:
     #Variables
@@ -46,6 +51,7 @@ class CPU:
         self.hyperThreading = False
         self.temperature = 0
     
+    #Update method
     def update(self):
         #Detecting CPU Name
         shell = os.popen(modelNameCommand)
@@ -61,7 +67,8 @@ class CPU:
 
         #Detecting CPU maximum Load
         shell = os.popen(CPUUsageCommand)
-        maxLoad = float(shell.read())
+        maxLoad = shell.read().strip()
+        maxLoad = float(maxLoad)
 
         #Detecting number of Physical Cores
         shell = os.popen(physicalCoresCommand)
@@ -128,6 +135,7 @@ class RAM:
         self.memoryTotal = 0
         self.memoryPercentage = 0
     
+    #Update method
     def update(self):
         #Reading used memory in MB
         shell = os.popen(memoryUsedCommand)
@@ -150,18 +158,89 @@ class RAM:
         }
         return summary
 
+#NIC Object
+class NIC:
+    #Variables
+    global nicNumber
+    global interfaceName
+    global IP
+    global MAC
+    global summary
+    
+    #Initialization of generic values
+    def __init__(self):
+        self.interfaceName = "GENERIC"
+        self.IP = "127.0.0.1"
+        self.MAC = "00:1e:06:49:0d:a8"
+
+    #Initialization but accepting NIC number
+    def __init__(self, nicNumber):
+        self.nicNumber = nicNumber
+        self.interfaceName = "GENERIC"
+        self.IP = "127.0.0.1"
+        self.MAC = "00:1e:06:49:0d:a8"
+
+    #Update method
+    def update(self, nicNumber):
+        #Reading interface IP
+        shell = os.popen(IPCommand.format(nicNumber))
+        self.IP = shell.read().strip()
+
+        #Reading interface name
+        shell = os.popen(interfaceNameCommand.format(self.IP,"'{print $3}'"))
+        self.interfaceName = shell.read().strip()
+
+        #Reading MAC address
+        if bool(self.interfaceName) == True:
+            shell=os.popen(macAddressCommand.format(self.interfaceName))
+            self.MAC = shell.read().strip()
+        else:
+            self.MAC = False
+
+    #Function to export list
+    def exportList(self):
+        summary = {
+            "nicNumber" : self.nicNumber,
+            "interfaceName" : self.interfaceName,
+            "IP" : self.IP,
+            "MAC" : self.MAC
+        }
+        return summary
+
+
 #Node Object
 class Node:
     #Variables
+    global hostname
+    global isOnline
     global processor
     global memory
+    global NICs
 
     #Initialization
+    shell = os.popen("hostname")
+    hostname = shell.read().strip()
     processor = CPU()
     memory = RAM()
+    NICs = list()
 
     #Function to initialize node
     #def __init__(self):
+
+    #Function to initialize NICs
+    def initNICs(self):
+        i = 1
+        nicsFound = False
+
+        while (nicsFound == False):
+            shell = os.popen(IPCommand.format(i))
+            tempIP = shell.read().strip()
+            if bool(tempIP) == True:
+                tempNIC = NIC(i)
+                NICs.append(tempNIC)
+                i += 1
+            else:
+                nicsFound = True
 
     #Function to get CPU
     def getCPU():
@@ -170,21 +249,48 @@ class Node:
     #Function to get RAM
     def getRAM():
         return memory
+
+    #Function to get entire NICList
+    def getNICList():
+        return NICs
+    
+    #Function to get Specific NIC from NICList
+    def getSpecificNIC(nicNumber):
+        return NICs[nicNumber]
     
     #Update Function
     def update():
         processor.update()
         memory.update()
+        counter = 1
+        for i in NICs:
+            i.update(counter)
+
+            #If MAC Address is not present, then the NIC is invalid and must be removed.
+            if bool(i.MAC) == False:
+                NICs.remove(i)
+
+            counter += 1
 
     #Function made to print statistics
     def printStats():
+        print(hostname)
+        print("\n")
         print(processor.exportList())
+        print("\n")
         print(memory.exportList())
+        print("\n")
+        counter = 1
+        for i in NICs:
+            counter += 1
+            print(i.exportList())
+            print("\n")
         return 0
 
 #Main Method
 def main():
     node = Node()
+    node.initNICs()
 
     counter = 0
     while True:
