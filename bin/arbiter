@@ -27,6 +27,10 @@ IPCommand="hostname -I | cut -d' ' -f{}"
 interfaceNameCommand="ip r | grep {} | awk {}"
 macAddressCommand="cat /sys/class/net/{}/address"
 
+#Disk Commands
+dfhCommand = "df -h | grep /dev/ | grep -v zram | grep -v fuse | grep -v tmpfs {}"
+#getDiskName="df -h | awk '{print $1}' | grep '/dev/' | sed 's/dev//g' | cut -d'/' -f3"
+
 #CPU Object
 class CPU:
     #Variables
@@ -207,7 +211,74 @@ class NIC:
         }
         return summary
 
+#Disk Object
+class Disk:
+    #Variables
+    global diskNumber
+    global diskName
+    global storageFree
+    global storageUsed
+    global totalStorage
+    global diskPercentage
+    global mountPoint
+    
+    #Function to initialize disks
+    def __init__(self):
+        self.diskNumber = 0
+        self.diskName = "null"
+        self.storageFree = 0
+        self.storageUsed = 0
+        self.totalStorage = 0
+        self.diskPercentage = 0
+        self.mountPoint = "/dev/null"
+    
+    #Function to initialize Disks in a more specific manner
+    def __init__(diskNumber, diskName, storageFree, storageUsed, totalStorage, diskPercentage, mountPoint):
+        self.diskNumber = diskNumber
+        self.diskName = diskName
+        self.storageFree = storageFree
+        self.storageUsed = storageUsed
+        self.totalStorage = totalStorage
+        self.diskPercentage = diskPercentage
+        self.mountPoint = mountPoint
+    
+    #Update method
+    def update(self, diskNumber):
+        #Reading disk Name
+        suffix = "| head -{} | tail -1"
+        awk = "| awk '{}'"
 
+        y = 0
+        while y <= 5:
+            shell = os.popen(dfhCommand.format(suffix.format(self.diskNumber)+awk.format("{print $"+str(y+1)+"}")))
+            if y == 0:
+                self.diskName = shell.read().strip()
+            if y == 1:
+                self.totalStorage = shell.read().strip()
+            if y == 2:
+                self.storageUsed = shell.read().strip()
+            if y == 3:
+                self.storageFree = shell.read().strip()
+            if y == 4:
+                self.diskPercentage = shell.read().strip()
+            if y == 5:
+                self.mountPoint = shell.read().strip()
+            y += 1
+        
+    
+    #Function to export list
+    def exportList(self):
+        summary = {
+            "diskNumber" : self.diskNumber,
+            "diskName" : self.diskName,
+            "storageFree" : self.storageFree,
+            "storageUsed" : self.storageUsed,
+            "totalStorage" : self.totalStorage,
+            "diskPercentage" : self.diskPercentage,
+            "mountPoint" : self.mountPoint
+        }
+        return summary
+    
 #Node Object
 class Node:
     #Variables
@@ -216,6 +287,7 @@ class Node:
     global processor
     global memory
     global NICs
+    global linuxDisks
 
     #Initialization
     shell = os.popen("hostname")
@@ -223,6 +295,7 @@ class Node:
     processor = CPU()
     memory = RAM()
     NICs = list()
+    linuxDisks = list()
 
     #Function to initialize node
     #def __init__(self):
@@ -240,7 +313,13 @@ class Node:
                 NICs.append(tempNIC)
                 i += 1
             else:
-                nicsFound = True
+                nicsFound = True    
+    
+    #Function to initialize LinuxDisks
+    def initLinuxDisks(self):
+        shell = os.popen(dfhCommand.format("| wc -l"))
+        diskCount = shell.read()
+        diskCount = int(diskCount)
 
     #Function to get CPU
     def getCPU():
@@ -254,6 +333,10 @@ class Node:
     def getNICList():
         return NICs
     
+    #Function to get entire LinuxDiskList
+    def getLinuxDiskList():
+        return linuxDisks
+    
     #Function to get Specific NIC from NICList
     def getSpecificNIC(nicNumber):
         return NICs[nicNumber]
@@ -262,6 +345,7 @@ class Node:
     def update():
         processor.update()
         memory.update()
+
         counter = 1
         for i in NICs:
             i.update(counter)
@@ -270,6 +354,11 @@ class Node:
             if bool(i.MAC) == False:
                 NICs.remove(i)
 
+            counter += 1
+        
+        counter = 1
+        for i in linuxDisks:
+            i.update(counter)
             counter += 1
 
     #Function made to print statistics
@@ -280,8 +369,15 @@ class Node:
         print("\n")
         print(memory.exportList())
         print("\n")
+
         counter = 1
         for i in NICs:
+            counter += 1
+            print(i.exportList())
+            print("\n")
+
+        counter = 1    
+        for i in linuxDisks:
             counter += 1
             print(i.exportList())
             print("\n")
